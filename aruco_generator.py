@@ -3,7 +3,7 @@ import argparse
 
 def save_markers(dictionary, num, folder):
     for i in range(num):
-        img = cv2.aruco.drawMarker(dictionary, i, 260)
+        img = cv2.aruco.drawMarker(dictionary, i, 250)
         cv2.imwrite(f'{folder}/marker{i}.jpg', img)
 
 # parse args

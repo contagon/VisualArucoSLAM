@@ -6,9 +6,9 @@ from plotting import *
 
 np.set_printoptions(suppress=True)
 
-idx_l = 6
-idx_c = 4
-idx_r = 2
+idx_l = 4
+idx_c = 2
+idx_r = 6
 
 # set up camera and import intrinsic parameters
 paramsl = np.load('params/left_params.npz')
@@ -21,7 +21,7 @@ all_cameras = [left, center, right]
 # setup aruco finder
 dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_APRILTAG_36h11)
 aruco_params = cv2.aruco.DetectorParameters_create()
-size = 2.65 #inches
+size = 2.6 #inches
 
 # setup iSAM
 parameters = gtsam.ISAM2Params()
@@ -29,8 +29,10 @@ parameters.setRelinearizeThreshold(0.01)
 parameters.setRelinearizeSkip(1)
 isam = gtsam.ISAM2(parameters)
 model = gtsam.noiseModel.Diagonal.Sigmas(np.array([.1, .1, .1, 5, 5, 5]))
+measure = gtsam.noiseModel.Diagonal.Sigmas(np.array([.5, .5, .5, 20, 20, 20]))
 i = 0
 seen = set()
+seen_iter = set()
 
 # Create a Factor Graph and Values to hold the new data
 graph = gtsam.NonlinearFactorGraph()
@@ -44,6 +46,7 @@ plt.ion()
 
 while(True):
     images = []
+    num_seen = 0
     for name, mtx, dist, cap, transform in all_cameras:
         #obtain camera image
         ret0, img = cap.read()
@@ -55,6 +58,7 @@ while(True):
 
         if markerIds is not None:
             for corners, id in zip(markerCorners, markerIds.flatten()):
+                num_seen += 1
                 # estimate pose for each marker
                 R, T, _ = cv2.aruco.estimatePoseSingleMarkers(corners, size, mtx, dist)
                 R, _ = cv2.Rodrigues(R)
@@ -62,12 +66,12 @@ while(True):
 
                 # add factor to graph
                 l_pose = transform.compose( gtsam.Pose3(gtsam.Rot3(R), T) )
-                graph.add(gtsam.BetweenFactorPose3(X(i), L(id), l_pose, model))
+                graph.add(gtsam.BetweenFactorPose3(X(i), L(id), l_pose, measure))
 
                 # add an estimate if we haven't seen it before
-                if id not in seen:
-                    seen.add(id)
+                if id not in seen.union(seen_iter):
                     initial_estimate.insert(L(id), gtsam.Pose3()) 
+                seen_iter.add(id)
 
 
     if i == 0:
@@ -83,9 +87,18 @@ while(True):
         if i != 1:
             initial_estimate.insert(X(i), estimate.atPose3(X(i-1)))
 
+        # if everything is new, add a prior
+        if seen_iter.intersection(seen) == set():
+            print("Added prior")
+            graph.push_back(gtsam.PriorFactorPose3(X(i), estimate.atPose3(X(i-1)), model))
+
         # update isam
-        isam.update(graph, initial_estimate)
-        estimate = isam.calculateEstimate()
+        print(num_seen)
+        if num_seen > 0:
+            isam.update(graph, initial_estimate)
+            estimate = isam.calculateEstimate()
+        else:
+            i -= 1
         
         # plot
         plot_3d(estimate, ax_3d, seen)
@@ -93,8 +106,12 @@ while(True):
         plt.pause(.00001)
 
         # clear everything out for next run
+        # graph.saveGraph(f"test_out_{i}.dot")
         graph.resize(0)
         initial_estimate.clear()
+
+    seen = seen.union(seen_iter)
+    seen_iter = set()
 
     i += 1
     cv2.imshow('image', cv2.hconcat(images))

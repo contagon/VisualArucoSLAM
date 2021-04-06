@@ -94,7 +94,7 @@ def plot_2d(result, isam, ax, seen):
     ax.set_aspect('equal')
 
 def cov_patch(origin, cov, color):
-    k = 5
+    k = 3
     w, v = np.linalg.eig(cov)
     angle = np.arctan2(v[1, 0], v[0, 0])
     return patches.Ellipse(origin, np.sqrt(w[0]*k), np.sqrt(w[1]*k),
