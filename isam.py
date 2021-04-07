@@ -6,9 +6,9 @@ from plotting import *
 
 np.set_printoptions(suppress=True)
 
-idx_l = 4
-idx_c = 2
-idx_r = 6
+idx_l = 6
+idx_c = 4
+idx_r = 2
 
 # set up camera and import intrinsic parameters
 paramsl = np.load('params/left_params.npz')
@@ -58,7 +58,6 @@ while(True):
 
         if markerIds is not None:
             for corners, id in zip(markerCorners, markerIds.flatten()):
-                num_seen += 1
                 # estimate pose for each marker
                 R, T, _ = cv2.aruco.estimatePoseSingleMarkers(corners, size, mtx, dist)
                 R, _ = cv2.Rodrigues(R)
@@ -73,7 +72,7 @@ while(True):
                     initial_estimate.insert(L(id), gtsam.Pose3()) 
                 seen_iter.add(id)
 
-
+    #  first one
     if i == 0:
         # add in origin for first pose estimate
         initial_estimate.insert(X(0), gtsam.Pose3())
@@ -81,40 +80,52 @@ while(True):
 
         # Add a prior on pose x0
         graph.push_back(gtsam.PriorFactorPose3(X(0), gtsam.Pose3(), model))
+        last_i = 1
 
+    # update one
     else:
-        # Guess new location if close to old one :)
-        if i != 1:
-            initial_estimate.insert(X(i), estimate.atPose3(X(i-1)))
+        # Guess new location close to old one :)
 
         # if everything is new, add a prior
-        if seen_iter.intersection(seen) == set():
-            print("Added prior")
-            graph.push_back(gtsam.PriorFactorPose3(X(i), estimate.atPose3(X(i-1)), model))
+        print(len(seen_iter))
+        if len(seen_iter) == 0:
+            i -= 1
+        elif seen_iter.intersection(seen) == set():
+            print("All new landmarks, adding prior")
+            graph.push_back(gtsam.PriorFactorPose3(X(i), estimate.atPose3(X(last_i)), model))
+        elif i != 1:
+            initial_estimate.insert(X(i), estimate.atPose3(X(last_i)))
+
+    seen = seen.union(seen_iter)
+    seen_iter = set()
+
+    # graph.saveGraph(f"test_out_{i}.dot")
+    
+    # update isam every 5 iterations
+    cv2.imshow('image', cv2.hconcat(images))
+    if (i+4) % 5 == 0:
+        last_i = i
 
         # update isam
-        print(num_seen)
-        if num_seen > 0:
-            isam.update(graph, initial_estimate)
-            estimate = isam.calculateEstimate()
-        else:
-            i -= 1
-        
+        isam.update(graph, initial_estimate)
+        estimate = isam.calculateEstimate()
+
+        # clear everything out for next run
+        graph.resize(0)
+        initial_estimate.clear()
+
         # plot
         plot_3d(estimate, ax_3d, seen)
         plot_2d(estimate, isam, ax_2d, seen)
         plt.pause(.00001)
 
-        # clear everything out for next run
-        # graph.saveGraph(f"test_out_{i}.dot")
-        graph.resize(0)
-        initial_estimate.clear()
+        key = cv2.waitKey(1)
+    else:
+        key = cv2.waitKey(100)
 
-    seen = seen.union(seen_iter)
-    seen_iter = set()
+    if key == ord('q'):
+        break
+            
 
     i += 1
-    cv2.imshow('image', cv2.hconcat(images))
-    if cv2.waitKey(1) == ord('q'):
-        break
     # print(i)
