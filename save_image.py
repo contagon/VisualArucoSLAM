@@ -21,4 +21,4 @@ all_cameras = [left, center, right]
 for name, cap in all_cameras:
     ret, img = cap.read()
 
-    cv2.imwrite(f"imagesL/tag_{name}.jpg", img)
+    cv2.imwrite(f"imagesR/tag_{name}.jpg", img)

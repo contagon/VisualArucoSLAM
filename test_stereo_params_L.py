@@ -19,6 +19,10 @@ all_cameras = [left, center, right]
 dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_APRILTAG_36h11)
 aruco_params = cv2.aruco.DetectorParameters_create()
 size = 2.6 #inches
+aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+aruco_params.cornerRefinementWinSize = 5
+aruco_params.cornerRefinementMaxIterations = 30
+aruco_params.cornerRefinementMinAccuracy = 1e-5
 
 poses = dict()
 for name, img, mtx, dist, transform in all_cameras:
@@ -45,5 +49,4 @@ print("From calibration\n", left[-1])
 # test = left[-1].compose( poses[id]['L'] )
 # print("From center camera\n", poses[id]['C'])
 # print("From calibration\n", test)
-
-np.savez('params/tag_left.npz', T=test.translation(), R=test.rotation())
+np.savez('params/tag_left.npz', T_L=test.translation(), R_L=test.rotation().matrix())
