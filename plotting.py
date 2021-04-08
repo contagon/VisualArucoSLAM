@@ -33,13 +33,19 @@ def plot_3d(result, ax, seen):
     i = 0
     while result.exists(X(i)):
         pose_i = result.atPose3(X(i))
-        gtsam_plot.plot_pose3_on_axes(ax, pose_i, 10)
+        gtsam_plot.plot_pose3_on_axes(ax, pose_i, 8)
         i += 1
 
     # plot landmarks
+    if isinstance(seen, int):
+        seen = np.arange(seen)
+
     for i in seen:
-        pose_i = result.atPose3(L(i))
-        gtsam_plot.plot_pose3_on_axes(ax, pose_i, 5)
+        try:
+            pose_i = result.atPose3(L(i))
+            gtsam_plot.plot_pose3_on_axes(ax, pose_i, 4)
+        except:
+            pass
 
     # draw
     ax.set_xlabel("X")
